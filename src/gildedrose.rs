@@ -1,4 +1,10 @@
 use std::fmt::{self, Display};
+
+const AGED_BRIE: &str = "Aged Brie";
+const BACKSTAGE_PASSES: &str = "Backstage passes to a TAFKAL80ETC concert";
+const SULFURAS: &str = "Sulfuras, Hand of Ragnaros";
+const CONJURED: &str = "Conjured Mana Cake";
+
 pub struct Item {
     pub name: String,
     pub sell_in: i32,
@@ -32,57 +38,86 @@ impl GildedRose {
 
     pub fn update_quality(&mut self) {
         for i in 0..self.items.len() {
-            if self.items[i].name != "Aged Brie"
-                && self.items[i].name != "Backstage passes to a TAFKAL80ETC concert"
-            {
-                if self.items[i].quality > 0 {
-                    if self.items[i].name != "Sulfuras, Hand of Ragnaros" {
-                        self.items[i].quality = self.items[i].quality - 1;
-                    }
-                }
-            } else {
-                if self.items[i].quality < 50 {
-                    self.items[i].quality = self.items[i].quality + 1;
-
-                    if self.items[i].name == "Backstage passes to a TAFKAL80ETC concert" {
-                        if self.items[i].sell_in < 11 {
-                            if self.items[i].quality < 50 {
-                                self.items[i].quality = self.items[i].quality + 1;
-                            }
-                        }
-
-                        if self.items[i].sell_in < 6 {
-                            if self.items[i].quality < 50 {
-                                self.items[i].quality = self.items[i].quality + 1;
-                            }
-                        }
-                    }
-                }
-            }
-
-            if self.items[i].name != "Sulfuras, Hand of Ragnaros" {
-                self.items[i].sell_in = self.items[i].sell_in - 1;
-            }
-
-            if self.items[i].sell_in < 0 {
-                if self.items[i].name != "Aged Brie" {
-                    if self.items[i].name != "Backstage passes to a TAFKAL80ETC concert" {
-                        if self.items[i].quality > 0 {
-                            if self.items[i].name != "Sulfuras, Hand of Ragnaros" {
-                                self.items[i].quality = self.items[i].quality - 1;
-                            }
-                        }
-                    } else {
-                        self.items[i].quality = self.items[i].quality - self.items[i].quality;
-                    }
-                } else {
-                    if self.items[i].quality < 50 {
-                        self.items[i].quality = self.items[i].quality + 1;
-                    }
-                }
-            }
+            let item = &mut self.items[i];
+            let updater = get_item_updater(item);
+            updater.update(item);
         }
     }
+}
+
+trait ItemUpdater {
+    fn update(&self, item: &mut Item) {
+        self.update_sell_in(item);
+        self.update_quality(item);
+    }
+    fn update_sell_in(&self, item: &mut Item) {
+        decrease_sell_in(item);
+    }
+    fn update_quality(&self, item: &mut Item);
+}
+
+struct GenericItemUpdater;
+impl ItemUpdater for GenericItemUpdater {
+    fn update_quality(&self, item: &mut Item) {
+        decrease_quality(item, 1);
+        if item.sell_in <= 0 {
+            decrease_quality(item, 1);
+        }
+    }
+}
+
+struct AgedBrieUpdater;
+impl ItemUpdater for AgedBrieUpdater {
+    fn update_quality(&self, item: &mut Item) {
+        increase_quality(item, 1);
+        if item.sell_in < 0 {
+            increase_quality(item, 1);
+        }
+    }
+}
+
+struct BackstagePassesUpdater;
+impl ItemUpdater for BackstagePassesUpdater {
+    fn update_quality(&self, item: &mut Item) {
+        increase_quality(item, 1);
+        if item.sell_in < 10 {
+            increase_quality(item, 1);
+        }
+        if item.sell_in < 5 {
+            increase_quality(item, 1);
+        }
+        if item.sell_in < 0 {
+            item.quality = 0;
+        }
+    }
+}
+
+struct SulfurasUpdater;
+impl ItemUpdater for SulfurasUpdater {
+    fn update_sell_in(&self, _item: &mut Item) {}
+    fn update_quality(&self, _item: &mut Item) {}
+}
+
+fn get_item_updater(item: &Item) -> Box<dyn ItemUpdater> {
+    match &item.name as &str {
+        AGED_BRIE => Box::new(AgedBrieUpdater),
+        BACKSTAGE_PASSES => Box::new(BackstagePassesUpdater),
+        SULFURAS => Box::new(SulfurasUpdater),
+        CONJURED => Box::new(GenericItemUpdater),
+        _ => Box::new(GenericItemUpdater),
+    }
+}
+
+fn decrease_sell_in(item: &mut Item) {
+    item.sell_in -= 1;
+}
+
+fn decrease_quality(item: &mut Item, amount: u32) {
+    item.quality = (item.quality - amount as i32).max(0);
+}
+
+fn increase_quality(item: &mut Item, amount: u32) {
+    item.quality = (item.quality + amount as i32).min(50);
 }
 
 #[cfg(test)]
